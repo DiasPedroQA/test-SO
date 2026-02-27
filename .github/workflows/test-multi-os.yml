@@ -70,51 +70,51 @@ jobs:
           echo "==================================="
           
           python -c "
-              import sys
-              import platform
-              import json
-              from pathlib import Path
+            import sys
+            import platform
+            import json
+            from pathlib import Path
 
-              # Adiciona o diretório atual ao path
-              sys.path.insert(0, '.')
-              from src.sistema_info import SistemaInfo
+            # Adiciona o diretório atual ao path
+            sys.path.insert(0, '.')
+            from src.sistema_info import SistemaInfo
 
-              # Obtém informações usando a classe correta
-              info = SistemaInfo.get_info_completa()
-              sistema_atual = platform.system()
+            # Obtém informações usando a classe correta
+            info = SistemaInfo.get_info_completa()
+            sistema_atual = platform.system()
 
-              # Mapeia as informações para exibição
-              print(f'\n🔍 SISTEMA DETECTADO: {info[\"sistema\"]}')
-              print(f'📌 Versão: {info[\"sistema_versao\"]}')
-              print(f'💻 Arquitetura: {info[\"arquitetura\"]}')
-              print(f'🏠 Home path: {info[\"home_path\"]}')
-              print(f'✅ Home válida: {SistemaInfo.validar_home_path()}')
+            # Mapeia as informações para exibição
+            print(f'\n🔍 SISTEMA DETECTADO: {info[\"sistema\"]}')
+            print(f'📌 Versão: {info[\"sistema_versao\"]}')
+            print(f'💻 Arquitetura: {info[\"arquitetura\"]}')
+            print(f'🏠 Home path: {info[\"home_path\"]}')
+            print(f'✅ Home válida: {SistemaInfo.validar_home_path()}')
 
-              # Informações específicas por SO
-              if 'distribuicao' in info:
-                  print(f'🐧 Distribuição Linux: {info[\"distribuicao\"]}')
-              if 'versao_macos' in info:
-                  print(f'🍎 Versão macOS: {info[\"versao_macos\"]}')
-              if 'variaveis_windows' in info:
-                  print(f'🪟 Variáveis Windows encontradas')
+            # Informações específicas por SO
+            if 'distribuicao' in info:
+                print(f'🐧 Distribuição Linux: {info[\"distribuicao\"]}')
+            if 'versao_macos' in info:
+                print(f'🍎 Versão macOS: {info[\"versao_macos\"]}')
+            if 'variaveis_windows' in info:
+                print(f'🪟 Variáveis Windows encontradas')
 
-              # Validação
-              if info['sistema'] == sistema_atual:
-                  print(f'\n✅ VALIDAÇÃO: Sistema correto!')
-              else:
-                  print(f'\n❌ VALIDAÇÃO: Sistema incorreto!')
+            # Validação
+            if info['sistema'] == sistema_atual:
+                print(f'\n✅ VALIDAÇÃO: Sistema correto!')
+            else:
+                print(f'\n❌ VALIDAÇÃO: Sistema incorreto!')
 
-              # Salva relatório
-              relatorio = {
-                  'sistema': sistema_atual,
-                  'info': info,
-                  'status': 'PASSOU' if info['sistema'] == sistema_atual else 'FALHOU'
-              }
+            # Salva relatório
+            relatorio = {
+                'sistema': sistema_atual,
+                'info': info,
+                'status': 'PASSOU' if info['sistema'] == sistema_atual else 'FALHOU'
+            }
 
-              filename = f'relatorio_{sistema_atual}.json'
-              with open(filename, 'w', encoding='utf-8') as f:
-                  json.dump(relatorio, f, indent=2, ensure_ascii=False)
-              print(f'\n📊 Relatório salvo: {filename}')
+            filename = f'relatorio_{sistema_atual}.json'
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(relatorio, f, indent=2, ensure_ascii=False)
+            print(f'\n📊 Relatório salvo: {filename}')
           "
         shell: bash
       
