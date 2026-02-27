@@ -32,20 +32,24 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       
-      # SOMENTE ESTE STEP FOI MODIFICADO
+      # CORRIGIDO: Usa Python em vez de Bash
       - name: Instalar dependências
         run: |
           python -m pip install --upgrade pip
           python -c "import os; os.system('pip install -r requirements.txt') if os.path.exists('requirements.txt') else print('✅ Sem requirements.txt')"
       
+      # CORRIGIDO: Usa sintaxe compatível com Windows
       - name: Executar testes
         env:
           PYTHONIOENCODING: utf-8
           PYTHONUTF8: 1
         run: |
-          export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+          # Configura PYTHONPATH de forma compatível com Windows
+          $env:PYTHONPATH = "$env:PYTHONPATH;$pwd"
           python -m unittest discover -v tests/
+        shell: pwsh
       
+      # CORRIGIDO: Usa Python para listar arquivos (compatível com Windows)
       - name: Gerar relatório
         env:
           PYTHONIOENCODING: utf-8
@@ -59,31 +63,50 @@ jobs:
           import json
           import os
           from pathlib import Path
+          
           print(f'🐍 Python {sys.version}')
           print(f'📂 Working dir: {os.getcwd()}')
-                  
+          
           sys.path.insert(0, '.')
           from src.sistema_info import SistemaInfo
+          
           info = SistemaInfo.get_info_completa()
           sistema = platform.system()
-          # Garante que o diretório existe e é gravável
+          
           output_dir = Path(os.environ.get('GITHUB_WORKSPACE', '.'))
           print(f'📁 Output dir: {output_dir}')
+          
           relatorio = {
-            'sistema': sistema,
-            'info': info,
-            'status': 'PASSOU'
+              'sistema': sistema,
+              'info': info,
+              'status': 'PASSOU'
           }
+          
           filename = output_dir / f'relatorio_{sistema}.json'
           with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(relatorio, f, indent=4, ensure_ascii=False)
+              json.dump(relatorio, f, indent=4, ensure_ascii=False)
+          
           print(f'✅ Relatório salvo: {filename}')
           print(f'📊 Tamanho: {filename.stat().st_size} bytes')
-          "
           
-          # Verificação final
-          echo "🔍 Verificando arquivos gerados:"
-          ls -la $GITHUB_WORKSPACE/relatorio_*.json || echo "⚠️ Nenhum relatório encontrado"
+          # Lista arquivos usando Python (compatível com Windows)
+          print('\n🔍 Arquivos encontrados:')
+          for file in output_dir.glob('relatorio_*.json'):
+              print(f'  - {file.name} ({file.stat().st_size} bytes)'
+          "
+                    
+                    # Verificação final usando Python (não 'ls')
+                    python -c "
+          import os
+          from pathlib import Path
+          output_dir = Path(os.environ.get('GITHUB_WORKSPACE', '.'))
+          files = list(output_dir.glob('relatorio_*.json'))
+          if files:
+              print(f'✅ {len(files)} relatório(s) encontrado(s)')
+          else:
+              print('⚠️ Nenhum relatório encontrado')
+              exit(1)
+          "
       
       - name: Upload relatório
         uses: actions/upload-artifact@v4
