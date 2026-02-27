@@ -125,16 +125,16 @@ jobs:
           PYTHONUTF8: 1
         run: |
           python -c "
-              import sys
-              import platform
-              sys.path.insert(0, '.')
-              from src.sistema_info import SistemaInfo
+          import sys
+          import platform
+          sys.path.insert(0, '.')
+          from src.sistema_info import SistemaInfo
 
-              info = SistemaInfo.get_info_completa()
-              sistema_real = platform.system()
+          info = SistemaInfo.get_info_completa()
+          sistema_real = platform.system()
 
-              assert info['sistema'] == sistema_real, f'Sistema incorreto: {info[\"sistema\"]} != {sistema_real}'
-              print('✅ Validação básica passou!')
+          assert info['sistema'] == sistema_real, f'Sistema incorreto: {info[\"sistema\"]} != {sistema_real}'
+          print('✅ Validação básica passou!')
           "
         shell: bash
       
