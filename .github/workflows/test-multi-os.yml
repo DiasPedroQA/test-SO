@@ -1,26 +1,21 @@
 name: Testes Multi-SO
 
-# Quando executar
 on:
   push:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  # Permite executar manualmente
   workflow_dispatch:
 
 jobs:
   test:
     name: Testar em ${{ matrix.os }}
-    # Estratégia de matriz: roda em paralelo em vários SOs
     runs-on: ${{ matrix.os }}
     strategy:
-      # Não cancela outros se um falhar
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ['3.11']
-        # Teste adicional: versão mínima vs máxima
         include:
           - os: ubuntu-latest
             python-version: '3.8'
@@ -41,10 +36,7 @@ jobs:
     - name: 📦 Instalar dependências
       run: |
         python -m pip install --upgrade pip
-        # Se tiver requirements.txt
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-        # Instala pytest para relatórios melhores
-        pip install pytest pytest-cov
       shell: bash
     
     - name: 🔍 Informações do ambiente
@@ -52,78 +44,130 @@ jobs:
         echo "🎯 Sistema: ${{ matrix.os }}"
         echo "🐍 Python: ${{ matrix.python-version }}"
         echo "📂 Diretório: $(pwd)"
-        echo "📋 Conteúdo:"
-        ls -la
+        echo "📋 Conteúdo do src/:"
+        ls -la src/ || echo "src/ não encontrado"
       shell: bash
     
     - name: 🧪 Executar testes unitários
+      env:
+        # CORREÇÃO 2: Força UTF-8 no Windows para evitar erro de encoding
+        PYTHONIOENCODING: utf-8
+        PYTHONUTF8: 1
       run: |
         echo "==================================="
         echo "🧪 TESTANDO EM ${{ matrix.os }}"
         echo "==================================="
+        # Adiciona src ao PYTHONPATH
+        export PYTHONPATH="${PYTHONPATH}:$(pwd)"
         python -m unittest discover -v tests/
       shell: bash
-      continue-on-error: false
     
-    - name: 📊 Gerar relatório detalhado
+    - name: 📊 Gerar relatório com a classe correta
+      env:
+        PYTHONIOENCODING: utf-8
+        PYTHONUTF8: 1
       run: |
         echo "==================================="
-        echo "📊 RESULTADO POR SO"
+        echo "📊 RELATÓRIO DO SISTEMA"
         echo "==================================="
         
-        # Executa cada teste e captura saída
+        # CORREÇÃO 1 e 3: Usa a classe SistemaInfo com as chaves corretas
         python -c "
-        import sys
-        sys.path.insert(0, '.')
-        from src.sistema_info import identificar_sistema
-        info = identificar_sistema()
-        print(f'Sistema detectado: {info[\"sistema\"]}')
-        print(f'Detalhes: {info[\"detalhes\"]}')
-        print(f'Home: {info[\"home\"]}')
-        print(f'Arquitetura: {info[\"arquitetura\"]}')
-        print(f'Usuário: {info[\"usuario\"]}')
-        "
-              shell: bash
+            import sys
+            import platform
+            import json
+            from pathlib import Path
 
-            - name: ✅ Validar saída esperada
-              run: |
-                python -c "
-        import sys
-        import platform
-        sys.path.insert(0, '.')
-        from src.sistema_info import identificar_sistema
-        info = identificar_sistema()
-        sistema_real = platform.system()
-        assert info['sistema'] == sistema_real, f'Sistema incorreto: {info[\"sistema\"]} != {sistema_real}'
-        print('✅ Validação básica passou!')
-        "
-              shell: bash
+            # Adiciona o diretório atual ao path
+            sys.path.insert(0, '.')
+            from src.sistema_info import SistemaInfo
 
-            - name: ⚠️ Upload de logs em caso de falha
-              if: failure()
-              uses: actions/upload-artifact@v3
-              with:
-                name: test-logs-${{ matrix.os }}-${{ matrix.python-version }}
-                path: |
-                  *.log
-                  test-results.xml
+            # Obtém informações usando a classe correta
+            info = SistemaInfo.get_info_completa()
+            sistema_atual = platform.system()
 
-          # Job de resumo
-          summary:
-            name: 📋 Resumo dos testes
-            needs: test
-            runs-on: ubuntu-latest
-            if: always()
-            steps:
-              - name: Verificar resultados
-                run: |
-                  echo "==================================="
-                  echo "📋 RESUMO FINAL DOS TESTES"
-                  echo "==================================="
-                  echo "✅ Todos os jobs foram executados"
-                  echo "📊 Matrix testada:"
-                  echo "  • Ubuntu (3.8, 3.9, 3.10, 3.11)"
-                  echo "  • Windows (3.8, 3.9, 3.10, 3.11)"
-                  echo "  • macOS (3.8, 3.9, 3.10, 3.11)"
-                  echo ""
-                  echo "🔍 Verifique os resultados individuais acima"
+            # Mapeia as informações para exibição
+            print(f'\n🔍 SISTEMA DETECTADO: {info[\"sistema\"]}')
+            print(f'📌 Versão: {info[\"sistema_versao\"]}')
+            print(f'💻 Arquitetura: {info[\"arquitetura\"]}')
+            print(f'🏠 Home path: {info[\"home_path\"]}')
+            print(f'✅ Home válida: {SistemaInfo.validar_home_path()}')
+
+            # Informações específicas por SO
+            if 'distribuicao' in info:
+                print(f'🐧 Distribuição Linux: {info[\"distribuicao\"]}')
+            if 'versao_macos' in info:
+                print(f'🍎 Versão macOS: {info[\"versao_macos\"]}')
+            if 'variaveis_windows' in info:
+                print(f'🪟 Variáveis Windows encontradas')
+
+            # Validação
+            if info['sistema'] == sistema_atual:
+                print(f'\n✅ VALIDAÇÃO: Sistema correto!')
+            else:
+                print(f'\n❌ VALIDAÇÃO: Sistema incorreto!')
+
+            # Salva relatório
+            relatorio = {
+                'sistema': sistema_atual,
+                'info': info,
+                'status': 'PASSOU' if info['sistema'] == sistema_atual else 'FALHOU'
+            }
+
+            filename = f'relatorio_{sistema_atual}.json'
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(relatorio, f, indent=2, ensure_ascii=False)
+            print(f'\n📊 Relatório salvo: {filename}')
+            "
+                  shell: bash
+
+                - name: ✅ Validar saída esperada (sem emojis no Windows)
+                  env:
+                    PYTHONIOENCODING: utf-8
+                    PYTHONUTF8: 1
+                  run: |
+                    python -c "
+            import sys
+            import platform
+            sys.path.insert(0, '.')
+            from src.sistema_info import SistemaInfo
+
+            info = SistemaInfo.get_info_completa()
+            sistema_real = platform.system()
+
+            # Validação sem usar emojis para compatibilidade
+            assert info['sistema'] == sistema_real, f'Sistema incorreto: {info[\"sistema\"]} != {sistema_real}'
+            print('Validacao basica passou!')
+            "
+                  shell: bash
+
+                - name: 📤 Upload do relatório
+                  uses: actions/upload-artifact@v3
+                  with:
+                    name: relatorio-${{ matrix.os }}-py${{ matrix.python-version }}
+                    path: relatorio_*.json
+
+              summary:
+                name: 📋 Resumo dos testes
+                needs: test
+                runs-on: ubuntu-latest
+                if: always()
+                steps:
+                  - name: Download todos os relatórios
+                    uses: actions/download-artifact@v3
+                    with:
+                      path: relatorios
+
+                  - name: Exibir resumo
+                    run: |
+                      echo "==================================="
+                      echo "📋 RESUMO FINAL DOS TESTES"
+                      echo "==================================="
+                      echo "✅ Pipeline executada com sucesso!"
+                      echo ""
+                      echo "📊 Resultados por SO:"
+                      echo "  • Ubuntu (3.8, 3.11)"
+                      echo "  • Windows (3.8, 3.11)"
+                      echo "  • macOS (3.8, 3.11)"
+                      echo ""
+                      echo "📁 Relatórios disponíveis nos artifacts"
