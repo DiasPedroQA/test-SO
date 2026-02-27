@@ -23,20 +23,26 @@ jobs:
             python-version: '3.8'
           - os: macos-latest
             python-version: '3.8'
-    
+
     steps:
-      - uses: actions/checkout@v3
-      
+      # CORREÇÃO: Remove shell do checkout (não precisa)
+      - uses: actions/checkout@v4
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      
+
       - name: Instalar dependências
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      
+          if [ -f requirements.txt ]; then 
+            pip install -r requirements.txt
+          else
+            echo "✅ Sem requirements.txt"
+          fi
+        shell: bash  # Mantém aqui (tem run)
+
       - name: Executar testes
         env:
           PYTHONIOENCODING: utf-8
@@ -44,14 +50,15 @@ jobs:
         run: |
           export PYTHONPATH="${PYTHONPATH}:$(pwd)"
           python -m unittest discover -v tests/
-      
+        shell: bash  # Mantém aqui (tem run)
+
       - name: Gerar relatório
         env:
           PYTHONIOENCODING: utf-8
           PYTHONUTF8: 1
         run: |
           echo "📊 Gerando relatório para ${{ matrix.os }}"
-          
+
           python -c "
           import sys
           import platform
@@ -61,39 +68,39 @@ jobs:
 
           print(f'🐍 Python {sys.version}')
           print(f'📂 Working dir: {os.getcwd()}')
-                  
+
           sys.path.insert(0, '.')
           from src.sistema_info import SistemaInfo
 
           info = SistemaInfo.get_info_completa()
           sistema = platform.system()
 
-          # Garante que o diretório existe e é gravável
           output_dir = Path(os.environ.get('GITHUB_WORKSPACE', '.'))
           print(f'📁 Output dir: {output_dir}')
 
           relatorio = {
-            'sistema': sistema,
-            'info': info,
-            'status': 'PASSOU'
+              'sistema': sistema,
+              'info': info,
+              'status': 'PASSOU' if info['sistema'] == sistema else 'FALHOU'
           }
 
           filename = output_dir / f'relatorio_{sistema}.json'
           with open(filename, 'w', encoding='utf-8') as f:
-            json.dump(relatorio, f, indent=4, ensure_ascii=False)
+              json.dump(relatorio, f, indent=2, ensure_ascii=False)
 
           print(f'✅ Relatório salvo: {filename}')
           print(f'📊 Tamanho: {filename.stat().st_size} bytes')
           "
-          
-          # Verificação final
-          echo "🔍 Verificando arquivos gerados:"
-          ls -la $GITHUB_WORKSPACE/relatorio_*.json || echo "⚠️ Nenhum relatório encontrado"
-      
-      - name: Upload relatório
-        uses: actions/upload-artifact@v4
-        with:
-          name: relatorio-${{ matrix.os }}-py${{ matrix.python-version }}
-          path: ${{ github.workspace }}/relatorio_*.json
-          if-no-files-found: warn
-          retention-days: 7
+
+                    echo "🔍 Verificando arquivos gerados:"
+                    ls -la $GITHUB_WORKSPACE/relatorio_*.json || echo "⚠️ Nenhum relatório encontrado"
+                  shell: bash  # Mantém aqui (tem run)
+
+                - name: Upload relatório
+                  uses: actions/upload-artifact@v4
+                  with:
+                    name: relatorio-${{ matrix.os }}-py${{ matrix.python-version }}
+                    path: ${{ github.workspace }}/relatorio_*.json
+                    if-no-files-found: warn
+                    retention-days: 7
+                  # CORREÇÃO: Remove shell daqui (não tem run, é uma action)
