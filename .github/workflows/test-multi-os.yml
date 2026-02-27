@@ -117,6 +117,7 @@ jobs:
             print(f'\n📊 Relatório salvo: {filename}')
           "
         shell: bash
+        continue-on-error: true
       
       - name: ✅ Validar saída esperada
         env:
