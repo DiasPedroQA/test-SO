@@ -2,116 +2,54 @@ name: Testes Multi-SO
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
   test:
-    name: Testar em ${{ matrix.os }}
+    name: ${{ matrix.os }} | Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
+
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.11']
-        include:
-          - os: ubuntu-latest
-            python-version: '3.8'
-          - os: windows-latest
-            python-version: '3.8'
-          - os: macos-latest
-            python-version: '3.8'
-    
+        python-version: ['3.8', '3.11']
+
     steps:
-      - uses: actions/checkout@v3
-      
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      
-      # CORRIGIDO: Usa Python em vez de Bash
+          cache: 'pip'
+
       - name: Instalar dependências
+        shell: bash
         run: |
           python -m pip install --upgrade pip
-          python -c "import os; os.system('pip install -r requirements.txt') if os.path.exists('requirements.txt') else print('✅ Sem requirements.txt')"
-      
-      # CORRIGIDO: Usa sintaxe compatível com Windows
-      - name: Executar testes
-        env:
-          PYTHONIOENCODING: utf-8
-          PYTHONUTF8: 1
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            echo "⚠️ Sem requirements.txt"
+          fi
+
+      - name: Rodar testes com coverage
+        shell: bash
         run: |
-          # Configura PYTHONPATH de forma compatível com Windows
-          $env:PYTHONPATH = "$env:PYTHONPATH;$pwd"
-          python -m unittest discover -v tests/
-        shell: pwsh
-      
-      # CORRIGIDO: Usa Python para listar arquivos (compatível com Windows)
-      - name: Gerar relatório
-        env:
-          PYTHONIOENCODING: utf-8
-          PYTHONUTF8: 1
-        run: |
-          echo "📊 Gerando relatório para ${{ matrix.os }}"
-          
-          python -c "
-          import sys
-          import platform
-          import json
-          import os
-          from pathlib import Path
-          
-          print(f'🐍 Python {sys.version}')
-          print(f'📂 Working dir: {os.getcwd()}')
-          
-          sys.path.insert(0, '.')
-          from src.sistema_info import SistemaInfo
-          
-          info = SistemaInfo.get_info_completa()
-          sistema = platform.system()
-          
-          output_dir = Path(os.environ.get('GITHUB_WORKSPACE', '.'))
-          print(f'📁 Output dir: {output_dir}')
-          
-          relatorio = {
-              'sistema': sistema,
-              'info': info,
-              'status': 'PASSOU'
-          }
-          
-          filename = output_dir / f'relatorio_{sistema}.json'
-          with open(filename, 'w', encoding='utf-8') as f:
-              json.dump(relatorio, f, indent=4, ensure_ascii=False)
-          
-          print(f'✅ Relatório salvo: {filename}')
-          print(f'📊 Tamanho: {filename.stat().st_size} bytes')
-          
-          # Lista arquivos usando Python (compatível com Windows)
-          print('\n🔍 Arquivos encontrados:')
-          for file in output_dir.glob('relatorio_*.json'):
-              print(f'  - {file.name} ({file.stat().st_size} bytes)'
-          "
-                    
-                    # Verificação final usando Python (não 'ls')
-                    python -c "
-          import os
-          from pathlib import Path
-          output_dir = Path(os.environ.get('GITHUB_WORKSPACE', '.'))
-          files = list(output_dir.glob('relatorio_*.json'))
-          if files:
-              print(f'✅ {len(files)} relatório(s) encontrado(s)')
-          else:
-              print('⚠️ Nenhum relatório encontrado')
-              exit(1)
-          "
-      
-      - name: Upload relatório
+          pytest tests/ \
+            --cov=src \
+            --cov-report=term-missing \
+            --cov-report=html \
+            --cov-report=xml
+
+      - name: Upload Coverage HTML
         uses: actions/upload-artifact@v4
         with:
-          name: relatorio-${{ matrix.os }}-py${{ matrix.python-version }}
-          path: ${{ github.workspace }}/relatorio_*.json
-          if-no-files-found: warn
+          name: coverage-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: htmlcov/
           retention-days: 7
