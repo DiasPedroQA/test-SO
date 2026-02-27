@@ -1,0 +1,4 @@
+# Sem dependências obrigatórias para testes básicos
+# Adicione aqui se precisar de algo específico
+pytest>=7.0.0  # Opcional, para testes mais avançados
+pytest-cov>=4.0.0  # Opcional, para cobertura de código

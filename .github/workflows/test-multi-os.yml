@@ -1,0 +1,129 @@
+name: Testes Multi-SO
+
+# Quando executar
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  # Permite executar manualmente
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Testar em ${{ matrix.os }}
+    # Estratégia de matriz: roda em paralelo em vários SOs
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Não cancela outros se um falhar
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11']
+        # Teste adicional: versão mínima vs máxima
+        include:
+          - os: ubuntu-latest
+            python-version: '3.8'
+          - os: windows-latest
+            python-version: '3.8'
+          - os: macos-latest
+            python-version: '3.8'
+    
+    steps:
+    - name: 📥 Checkout do código
+      uses: actions/checkout@v3
+    
+    - name: 🐍 Configurar Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: 📦 Instalar dependências
+      run: |
+        python -m pip install --upgrade pip
+        # Se tiver requirements.txt
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        # Instala pytest para relatórios melhores
+        pip install pytest pytest-cov
+      shell: bash
+    
+    - name: 🔍 Informações do ambiente
+      run: |
+        echo "🎯 Sistema: ${{ matrix.os }}"
+        echo "🐍 Python: ${{ matrix.python-version }}"
+        echo "📂 Diretório: $(pwd)"
+        echo "📋 Conteúdo:"
+        ls -la
+      shell: bash
+    
+    - name: 🧪 Executar testes unitários
+      run: |
+        echo "==================================="
+        echo "🧪 TESTANDO EM ${{ matrix.os }}"
+        echo "==================================="
+        python -m unittest discover -v tests/
+      shell: bash
+      continue-on-error: false
+    
+    - name: 📊 Gerar relatório detalhado
+      run: |
+        echo "==================================="
+        echo "📊 RESULTADO POR SO"
+        echo "==================================="
+        
+        # Executa cada teste e captura saída
+        python -c "
+        import sys
+        sys.path.insert(0, '.')
+        from src.sistema_info import identificar_sistema
+        info = identificar_sistema()
+        print(f'Sistema detectado: {info[\"sistema\"]}')
+        print(f'Detalhes: {info[\"detalhes\"]}')
+        print(f'Home: {info[\"home\"]}')
+        print(f'Arquitetura: {info[\"arquitetura\"]}')
+        print(f'Usuário: {info[\"usuario\"]}')
+        "
+              shell: bash
+
+            - name: ✅ Validar saída esperada
+              run: |
+                python -c "
+        import sys
+        import platform
+        sys.path.insert(0, '.')
+        from src.sistema_info import identificar_sistema
+        info = identificar_sistema()
+        sistema_real = platform.system()
+        assert info['sistema'] == sistema_real, f'Sistema incorreto: {info[\"sistema\"]} != {sistema_real}'
+        print('✅ Validação básica passou!')
+        "
+              shell: bash
+
+            - name: ⚠️ Upload de logs em caso de falha
+              if: failure()
+              uses: actions/upload-artifact@v3
+              with:
+                name: test-logs-${{ matrix.os }}-${{ matrix.python-version }}
+                path: |
+                  *.log
+                  test-results.xml
+
+          # Job de resumo
+          summary:
+            name: 📋 Resumo dos testes
+            needs: test
+            runs-on: ubuntu-latest
+            if: always()
+            steps:
+              - name: Verificar resultados
+                run: |
+                  echo "==================================="
+                  echo "📋 RESUMO FINAL DOS TESTES"
+                  echo "==================================="
+                  echo "✅ Todos os jobs foram executados"
+                  echo "📊 Matrix testada:"
+                  echo "  • Ubuntu (3.8, 3.9, 3.10, 3.11)"
+                  echo "  • Windows (3.8, 3.9, 3.10, 3.11)"
+                  echo "  • macOS (3.8, 3.9, 3.10, 3.11)"
+                  echo ""
+                  echo "🔍 Verifique os resultados individuais acima"
