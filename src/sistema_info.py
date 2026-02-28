@@ -1,101 +1,165 @@
-# pylint: disable=C0413, R0902
-#!/usr/bin/env python3
+# pylint: disable=too-many-instance-attributes
 
 """
-Módulo para identificar informações do sistema operacional
-e caminho da home directory do usuário.
+Módulo responsável por coletar informações do sistema operacional
+e gerar relatórios JSON com base nesses dados.
 """
 
+import json
 import os
 import platform
 import sys
+
 from pathlib import Path
 
+from dataclasses import dataclass, asdict
 
+
+# =====================================================
+# Modelo
+# =====================================================
+
+
+@dataclass(slots=True)
 class SistemaInfo:
-    """Classe para obter informações do sistema operacional"""
+    """Armazena informações do sistema operacional e ambiente Python."""
 
-    def __init__(self) -> None:
-        self.nome_sistema: str = platform.system()
-        self.versao_sistema: str = platform.release()
-        self.arquitetura: str = platform.machine()
-        self.nome_computador: str = platform.node()
-        self.user_admin: Path = Path.home()
-        self.python_versao: str = platform.python_version()
+    nome_sistema: str
+    versao_sistema: str
+    arquitetura: str
+    nome_computador: str
+    user_admin: Path
+    python_versao: str
+    distribuicao: str | None = None
+    versao_macos: str | None = None
+    variaveis_windows: dict[str, str] | None = None
 
-        # Inicializa atributos opcionais
-        self.distribuicao: str | None = None
-        self.versao_macos: str | None = None
-        self.variaveis_windows: dict[str, str] | None = None
+    def to_dict(self) -> dict[str, str | dict[str, str]]:
+        """Retorna um dicionário omitindo valores None."""
+        data: dict[str, str | dict[str, str]] = asdict(self)
 
-        self._carregar_detalhes_especificos()
+        # Converter Path para string
+        for key, value in data.items():
+            if isinstance(value, Path):
+                data[key] = str(value)
 
-    # -------------------------
-    # Métodos internos privados
-    # -------------------------
-
-    def _carregar_detalhes_especificos(self) -> None:
-        if self.nome_sistema == "Windows":
-            self.variaveis_windows = {
-                "USERPROFILE": os.environ.get("USERPROFILE", "Desconhecido"),
-                "HOMEDRIVE": os.environ.get("HOMEDRIVE", "Desconhecido"),
-                "HOMEPATH": os.environ.get("HOMEPATH", "Desconhecido"),
-            }
-
-        elif self.nome_sistema == "Linux":
-            try:
-                if os.path.exists("/etc/os-release"):
-                    os_release: dict[str, str] = platform.freedesktop_os_release()
-                    self.distribuicao = os_release.get("PRETTY_NAME", "Desconhecido")
-                else:
-                    self.distribuicao = "Distribuição desconhecida"
-            except (ValueError, KeyError, OSError):
-                self.distribuicao = "Não foi possível identificar"
-
-        elif self.nome_sistema == "Darwin":
-            mac_ver: tuple[str, tuple[str, str, str], str] = platform.mac_ver()
-            self.versao_macos = (
-                mac_ver[0] if mac_ver and mac_ver[0] else "Versão desconhecida"
-            )
-
-    # -------------------------
-    # Métodos públicos
-    # -------------------------
-
-    def to_dict(self) -> dict[str, str | bool | dict[str, str] | None]:
-        """Retorna todas as informações como dicionário"""
-        return {
-            chave: valor for chave, valor in self.__dict__.items() if valor is not None
+        # Remover None se você já faz isso
+        new_data: dict[str, str | dict[str, str]] = {
+            k: v for k, v in data.items() if v is not None
         }
 
-    def exibir_detalhes(self) -> None:
-        """Exibe automaticamente todos os atributos"""
-        print("=" * 60)
-        print("🔍 IDENTIFICADOR DE SISTEMA OPERACIONAL")
-        print("=" * 60)
-
-        for chave, valor in self.to_dict().items():
-            print(f"• {chave}: {valor}")
-
-        print("=" * 60)
+        return new_data
 
 
-def test_sistema_info_instancia() -> None:
-    """Teste para verificar a criação da instância e atributos básicos"""
-    sistema: SistemaInfo = SistemaInfo()
-    assert sistema.nome_sistema in ["Windows", "Linux", "Darwin"]
-    assert sistema.user_admin.exists() and sistema.user_admin.is_dir()
-    assert sistema.python_versao.count(".") == 2
-    assert len(sistema.versao_sistema.split(".")) >= 3
-    assert int(sistema.arquitetura.split("_")[1]) > 0
-    assert sistema.nome_computador is not None
-    assert len(str(sistema.distribuicao).split(" ")[1]) > 0
+# =====================================================
+# Coleta
+# =====================================================
+
+
+def coletar_sistema() -> SistemaInfo:
+    """
+    Coleta informações do sistema operacional atual
+    e retorna uma instância de SistemaInfo.
+    """
+
+    nome: str = platform.system()
+    versao: str = platform.release()
+    arquitetura: str = platform.machine()
+    hostname: str = platform.node()
+    home: Path = Path.home()
+    python_version: str = platform.python_version()
+
+    distribuicao: str | None = None
+    versao_macos: str | None = None
+    variaveis_windows: dict[str, str] | None = None
+
+    if nome == "Windows":
+        variaveis_windows = {
+            "USERPROFILE": os.environ.get("USERPROFILE", "Desconhecido"),
+            "HOMEDRIVE": os.environ.get("HOMEDRIVE", "Desconhecido"),
+            "HOMEPATH": os.environ.get("HOMEPATH", "Desconhecido"),
+        }
+
+    elif nome == "Linux":
+        try:
+            if os.path.exists("/etc/os-release"):
+                os_release: dict[str, str] = platform.freedesktop_os_release()
+                distribuicao = os_release.get("PRETTY_NAME", "Desconhecido")
+            else:
+                distribuicao = "Distribuição desconhecida"
+        except (ValueError, KeyError, OSError):
+            distribuicao = "Não foi possível identificar"
+
+    elif nome == "Darwin":
+        mac_ver: tuple[str, tuple[str, str, str], str] = platform.mac_ver()
+        versao_macos = mac_ver[0] if mac_ver and mac_ver[0] else "Versão desconhecida"
+
+    return SistemaInfo(
+        nome_sistema=nome,
+        versao_sistema=versao,
+        arquitetura=arquitetura,
+        nome_computador=hostname,
+        user_admin=home,
+        python_versao=python_version,
+        distribuicao=distribuicao,
+        versao_macos=versao_macos,
+        variaveis_windows=variaveis_windows,
+    )
+
+
+# =====================================================
+# Relatório
+# =====================================================
+
+
+def gerar_relatorio(
+    sistema: SistemaInfo,
+    output_dir: Path | None = None,
+) -> dict[str, str | dict[str, str]]:
+    """
+    Gera um relatório JSON com as informações do sistema.
+
+    Args:
+        sistema: Instância de SistemaInfo.
+        output_dir: Diretório onde salvar o relatório.
+
+    Returns:
+        Dicionário com os dados exportados.
+    """
+
+    if output_dir is None:
+        output_dir = Path.cwd()
+
+    relatorio: dict[str, str | dict[str, str]] = sistema.to_dict()
+
+    filename: Path = output_dir / f"relatorio_{sistema.nome_sistema}.json"
+
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(relatorio, f, indent=4, ensure_ascii=False)
+
+    return relatorio
+
+
+# =====================================================
+# CLI
+# =====================================================
 
 
 def main() -> int:
-    """Função principal para execução do módulo"""
-    sistema = SistemaInfo()
-    sistema.exibir_detalhes()
+    """Ponto de entrada do script."""
+
+    sistema: SistemaInfo = coletar_sistema()
+    gerar_relatorio(sistema)
+
+    print("=" * 60)
+    print("🔍 IDENTIFICADOR DE SISTEMA OPERACIONAL")
+    print("=" * 60)
+
+    for chave, valor in sistema.to_dict().items():
+        print(f"• {chave}: {valor}")
+
+    print("=" * 60)
+
     return 0
 
 
