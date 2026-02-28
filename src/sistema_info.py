@@ -1,4 +1,4 @@
-# pylint: disable=C0413
+# pylint: disable=C0413, R0902
 #!/usr/bin/env python3
 
 """
@@ -10,150 +10,94 @@ import os
 import platform
 import sys
 from pathlib import Path
-from typing import Dict, Any
 
 
 class SistemaInfo:
     """Classe para obter informações do sistema operacional"""
 
-    @staticmethod
-    def get_nome_sistema() -> str:
-        """
-        Retorna o nome do sistema operacional.
+    def __init__(self) -> None:
+        self.nome_sistema: str = platform.system()
+        self.versao_sistema: str = platform.release()
+        self.arquitetura: str = platform.machine()
+        self.nome_computador: str = platform.node()
+        self.user_admin: Path = Path.home()
+        self.python_versao: str = platform.python_version()
 
-        Returns:
-            str: Nome do SO (Linux, Windows, Darwin, etc.)
-        """
-        return platform.system()
+        # Inicializa atributos opcionais
+        self.distribuicao: str | None = None
+        self.versao_macos: str | None = None
+        self.variaveis_windows: dict[str, str] | None = None
 
-    @staticmethod
-    def get_home_path() -> str:
-        """
-        Retorna o caminho absoluto da home directory do usuário.
+        self._carregar_detalhes_especificos()
 
-        Returns:
-            str: Caminho da home directory
-        """
-        return str(Path.home())
+    # -------------------------
+    # Métodos internos privados
+    # -------------------------
 
-    @staticmethod
-    def get_info_completa() -> Dict[str, Any]:
-        """
-        Retorna um dicionário com todas as informações do sistema.
-
-        Returns:
-            dict: Informações completas do sistema
-        """
-        sistema = platform.system()
-
-        info: dict[str, str | dict[str, str]] = {
-            "sistema": sistema,
-            "sistema_versao": platform.release(),
-            "arquitetura": platform.machine(),
-            "hostname": platform.node(),
-            "home_path": SistemaInfo.get_home_path(),
-            "metodo_home": "Path.home()",
-            "python_versao": platform.python_version(),
-        }
-
-        # CORREÇÃO 1: Adiciona informações específicas por SO
-        # Em vez de usar update() com dicionário aninhado, adiciona as chaves diretamente
-        if sistema == "Windows":
-            # CORREÇÃO: Adiciona cada chave individualmente, não um dicionário aninhado
-            info["USERPROFILE"] = os.environ.get("USERPROFILE", "")
-            info["HOMEDRIVE"] = os.environ.get("HOMEDRIVE", "")
-            info["HOMEPATH"] = os.environ.get("HOMEPATH", "")
-
-            # Opcional: manter o dicionário agrupado se preferir
-            info["variaveis_windows"] = {
-                "USERPROFILE": os.environ.get("USERPROFILE", ""),
-                "HOMEDRIVE": os.environ.get("HOMEDRIVE", ""),
-                "HOMEPATH": os.environ.get("HOMEPATH", ""),
+    def _carregar_detalhes_especificos(self) -> None:
+        if self.nome_sistema == "Windows":
+            self.variaveis_windows = {
+                "USERPROFILE": os.environ.get("USERPROFILE", "Desconhecido"),
+                "HOMEDRIVE": os.environ.get("HOMEDRIVE", "Desconhecido"),
+                "HOMEPATH": os.environ.get("HOMEPATH", "Desconhecido"),
             }
 
-        elif sistema == "Linux":
-            # CORREÇÃO: Tratamento seguro para freedesktop_os_release()
+        elif self.nome_sistema == "Linux":
             try:
-                # Verifica se o arquivo existe antes de tentar ler
                 if os.path.exists("/etc/os-release"):
-                    os_release = platform.freedesktop_os_release()
-                    distribuicao = os_release.get("PRETTY_NAME", "Desconhecido")
+                    os_release: dict[str, str] = platform.freedesktop_os_release()
+                    self.distribuicao = os_release.get("PRETTY_NAME", "Desconhecido")
                 else:
-                    distribuicao = "Distribuição desconhecida"
-            except (FileNotFoundError, AttributeError, KeyError):
-                distribuicao = "Não foi possível identificar"
+                    self.distribuicao = "Distribuição desconhecida"
+            except (ValueError, KeyError, OSError):
+                self.distribuicao = "Não foi possível identificar"
 
-            info["distribuicao"] = distribuicao
-            info["kernel"] = platform.release()
+        elif self.nome_sistema == "Darwin":
+            mac_ver: tuple[str, tuple[str, str, str], str] = platform.mac_ver()
+            self.versao_macos = (
+                mac_ver[0] if mac_ver and mac_ver[0] else "Versão desconhecida"
+            )
 
-        elif sistema == "Darwin":  # macOS
-            # CORREÇÃO: Tratamento seguro para mac_ver()
-            mac_ver = platform.mac_ver()
-            versao = mac_ver[0] if mac_ver and mac_ver[0] else "Versão desconhecida"
-            info["versao_macos"] = versao
+    # -------------------------
+    # Métodos públicos
+    # -------------------------
 
-        return info
+    def to_dict(self) -> dict[str, str | bool | dict[str, str] | None]:
+        """Retorna todas as informações como dicionário"""
+        return {
+            chave: valor for chave, valor in self.__dict__.items() if valor is not None
+        }
 
-    @staticmethod
-    def validar_home_path() -> bool:
-        """
-        Valida se o caminho da home directory existe e é acessível.
+    def exibir_detalhes(self) -> None:
+        """Exibe automaticamente todos os atributos"""
+        print("=" * 60)
+        print("🔍 IDENTIFICADOR DE SISTEMA OPERACIONAL")
+        print("=" * 60)
 
-        Returns:
-            bool: True se válido, False caso contrário
-        """
-        home = Path.home()
-        return home.exists() and home.is_dir()
+        for chave, valor in self.to_dict().items():
+            print(f"• {chave}: {valor}")
+
+        print("=" * 60)
 
 
-def main():
-    """Função principal para demonstração"""
-    print("=" * 60)
-    print("🔍 IDENTIFICADOR DE SISTEMA OPERACIONAL")
-    print("=" * 60)
+def test_sistema_info_instancia() -> None:
+    """Teste para verificar a criação da instância e atributos básicos"""
+    sistema: SistemaInfo = SistemaInfo()
+    assert sistema.nome_sistema in ["Windows", "Linux", "Darwin"]
+    assert sistema.user_admin.exists() and sistema.user_admin.is_dir()
+    assert sistema.python_versao.count(".") == 2
+    assert len(sistema.versao_sistema.split(".")) >= 3
+    assert int(sistema.arquitetura.split("_")[1]) > 0
+    assert sistema.nome_computador is not None
+    assert len(str(sistema.distribuicao).split(" ")[1]) > 0
 
-    info = SistemaInfo.get_info_completa()
 
-    print("\n📋 INFORMAÇÕES DO SISTEMA:")
-    print(f"  • Sistema: {info['sistema']}")
-    print(f"  • Versão: {info['sistema_versao']}")
-    print(f"  • Arquitetura: {info['arquitetura']}")
-    print(f"  • Hostname: {info['hostname']}")
-
-    print("\n🏠 HOME DIRECTORY:")
-    print(f"  • Caminho: {info['home_path']}")
-    print(f"  • Método: {info['metodo_home']}")
-    print(f"  • Válido: {'✅ Sim' if SistemaInfo.validar_home_path() else '❌ Não'}")
-
-    # CORREÇÃO 3: Ajusta a exibição das informações específicas
-    if "distribuicao" in info:
-        print("\n🐧 LINUX:")
-        print(f"  • Distribuição: {info['distribuicao']}")
-
-    if "versao_macos" in info:
-        print("\n🍎 MACOS:")
-        print(f"  • Versão: {info['versao_macos']}")
-
-    # CORREÇÃO: Verifica se o dicionário aninhado existe antes de iterar
-    if "variaveis_windows" in info:
-        print("\n🪟 WINDOWS (agrupado):")
-        for var, valor in info["variaveis_windows"].items():
-            print(f"  • {var}: {valor}")
-
-    # Também mostra as variáveis individuais se existirem
-    variaveis_individuais = ["USERPROFILE", "HOMEDRIVE", "HOMEPATH"]
-    if any(var in info for var in variaveis_individuais):
-        print("\n🪟 WINDOWS (variáveis individuais):")
-        for var in variaveis_individuais:
-            if var in info:
-                print(f"  • {var}: {info[var]}")
-
-    print("\n" + "=" * 60)
-
-    # CORREÇÃO 4: Usa sys.exit em vez de exit() (resolve o aviso do Pylint)
+def main() -> int:
+    """Função principal para execução do módulo"""
+    sistema = SistemaInfo()
+    sistema.exibir_detalhes()
     return 0
 
 
 if __name__ == "__main__":
-    # CORREÇÃO: Usa sys.exit em vez de exit()
     sys.exit(main())
