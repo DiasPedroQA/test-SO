@@ -8,11 +8,8 @@ e gerar relatórios JSON com base nesses dados.
 import json
 import os
 import platform
-import sys
-
 from pathlib import Path
-
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 
 
 # =====================================================
@@ -32,10 +29,13 @@ class SistemaInfo:
     python_versao: str
     distribuicao: str | None = None
     versao_macos: str | None = None
-    variaveis_windows: dict[str, str] | None = None
+    variaveis_windows: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, str | dict[str, str]]:
-        """Retorna um dicionário omitindo valores None."""
+        """
+        Retorna um dicionário serializável em JSON,
+        omitindo valores None.
+        """
         data: dict[str, str | dict[str, str]] = asdict(self)
 
         # Converter Path para string
@@ -43,12 +43,8 @@ class SistemaInfo:
             if isinstance(value, Path):
                 data[key] = str(value)
 
-        # Remover None se você já faz isso
-        new_data: dict[str, str | dict[str, str]] = {
-            k: v for k, v in data.items() if v is not None
-        }
-
-        return new_data
+        # Remover valores None
+        return {k: v for k, v in data.items() if v is not None}
 
 
 # =====================================================
@@ -71,7 +67,7 @@ def coletar_sistema() -> SistemaInfo:
 
     distribuicao: str | None = None
     versao_macos: str | None = None
-    variaveis_windows: dict[str, str] | None = None
+    variaveis_windows: dict[str, str] = {}
 
     if nome == "Windows":
         variaveis_windows = {
@@ -131,37 +127,9 @@ def gerar_relatorio(
         output_dir = Path.cwd()
 
     relatorio: dict[str, str | dict[str, str]] = sistema.to_dict()
-
     filename: Path = output_dir / f"relatorio_{sistema.nome_sistema}.json"
 
-    with open(filename, "w", encoding="utf-8") as f:
-        json.dump(relatorio, f, indent=4, ensure_ascii=False)
+    with open(filename, "w", encoding="utf-8") as file:
+        json.dump(relatorio, file, indent=4, ensure_ascii=False)
 
     return relatorio
-
-
-# =====================================================
-# CLI
-# =====================================================
-
-
-def main() -> int:
-    """Ponto de entrada do script."""
-
-    sistema: SistemaInfo = coletar_sistema()
-    gerar_relatorio(sistema)
-
-    print("=" * 60)
-    print("🔍 IDENTIFICADOR DE SISTEMA OPERACIONAL")
-    print("=" * 60)
-
-    for chave, valor in sistema.to_dict().items():
-        print(f"• {chave}: {valor}")
-
-    print("=" * 60)
-
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

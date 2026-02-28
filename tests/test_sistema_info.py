@@ -1,18 +1,56 @@
-"""
-Testes para SistemaInfo, coletar_sistema e gerar_relatorio
-"""
+# test_sistema_info.py
+
+"""Testes para SistemaInfo, coletar_sistema e gerar_relatorio"""
 
 import json
 from pathlib import Path
-from src.sistema_info import SistemaInfo, gerar_relatorio
+
+from pytest import MonkeyPatch
+
+from src.sistema_info import SistemaInfo, coletar_sistema, gerar_relatorio
+
+
+# =====================================================
+# Coleta
+# =====================================================
+
+
+def test_sistema_info_e_coleta(
+    sistema_parametrizado: SistemaInfo,
+) -> None:
+    """Testa criação de SistemaInfo e coleta de dados básicos."""
+
+    assert sistema_parametrizado.nome_sistema in ["Linux", "Windows", "Darwin"]
+
+    if sistema_parametrizado.nome_sistema == "Windows":
+        variaveis_windows: dict[str, str] | str | None = (
+            sistema_parametrizado.variaveis_windows
+        )
+        assert variaveis_windows["USERPROFILE"] is not None
+        assert variaveis_windows["USERPROFILE"] == "C:\\Users\\Test"
+        assert variaveis_windows["HOMEDRIVE"] == "C:"
+        assert variaveis_windows["HOMEPATH"] == "\\Users\\Test"
+
+    if sistema_parametrizado.nome_sistema == "Linux":
+        assert sistema_parametrizado.distribuicao == "Ubuntu 22.04"
+
+    if sistema_parametrizado.nome_sistema == "Darwin":
+        assert sistema_parametrizado.versao_macos == "14.0"
+
+    assert sistema_parametrizado.nome_computador == "TestMachine"
+    assert sistema_parametrizado.python_versao == "3.11.0"
+    assert sistema_parametrizado.arquitetura == "x86_64"
+    assert sistema_parametrizado.user_admin.exists()
 
 
 # ======================================================
-# Testes de instanciação e atributos básicos
+# Instanciação
 # ======================================================
 
 
-def test_instancia_criada(sistema_parametrizado: SistemaInfo) -> None:
+def test_instancia_criada(
+    sistema_parametrizado: SistemaInfo,
+) -> None:
     """Verifica criação básica da instância"""
 
     sistema: SistemaInfo = sistema_parametrizado
@@ -24,38 +62,19 @@ def test_instancia_criada(sistema_parametrizado: SistemaInfo) -> None:
     assert sistema.user_admin.exists()
 
 
-def test_to_dict_nao_tem_none(sistema_parametrizado: SistemaInfo) -> None:
-    """Garante que to_dict não retorna valores None"""
+def test_to_dict_nao_tem_valores_vazios(
+    sistema_parametrizado: SistemaInfo,
+) -> None:
+    """Garante que to_dict não retorna valores vazios"""
 
     info: dict[str, str | dict[str, str]] = sistema_parametrizado.to_dict()
 
     for valor in info.values():
-        assert valor is not None
+        assert valor not in ("", {}, None)
 
 
 # ======================================================
-# Testes específicos por sistema operacional
-# ======================================================
-
-
-def test_info_especifica_por_so(sistema_parametrizado: SistemaInfo) -> None:
-    """Verifica se campos específicos são preenchidos corretamente"""
-
-    sistema: SistemaInfo = sistema_parametrizado
-
-    if sistema.nome_sistema == "Linux":
-        assert sistema.distribuicao == "Ubuntu 22.04"
-
-    elif sistema.nome_sistema == "Windows":
-        assert sistema.variaveis_windows is not None
-        assert sistema.variaveis_windows["USERPROFILE"] == "C:\\Users\\Test"
-
-    elif sistema.nome_sistema == "Darwin":
-        assert sistema.versao_macos == "14.0"
-
-
-# ======================================================
-# Teste de geração de relatório
+# Relatório
 # ======================================================
 
 
@@ -70,12 +89,70 @@ def test_gerar_relatorio(
         output_dir=tmp_path,
     )
 
-    # Verifica se arquivo foi criado
     arquivos: list[Path] = list(tmp_path.glob("relatorio_*.json"))
     assert len(arquivos) == 1
 
-    # Verifica conteúdo do arquivo
     with open(arquivos[0], encoding="utf-8") as f:
-        data: dict[str, str | dict[str, str]] = dict(json.load(f))
+        data = json.load(f)
 
     assert data == relatorio
+
+
+def test_gerar_relatorio_sem_output_dir(
+    sistema_parametrizado: SistemaInfo,
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Testa geração usando Path.cwd()"""
+
+    monkeypatch.setattr("pathlib.Path.cwd", lambda: tmp_path)
+
+    gerar_relatorio(sistema_parametrizado)
+
+    arquivos: list[Path] = list(tmp_path.glob("relatorio_*.json"))
+    assert len(arquivos) == 1
+
+
+# ======================================================
+# Casos específicos extras (branches)
+# ======================================================
+
+
+def test_linux_sem_os_release(
+    monkeypatch: MonkeyPatch,
+    fake_home: Path,
+) -> None:
+    """Linux sem arquivo /etc/os-release"""
+
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+    monkeypatch.setattr("platform.release", lambda: "1.0")
+    monkeypatch.setattr("platform.machine", lambda: "x86_64")
+    monkeypatch.setattr("platform.node", lambda: "TestMachine")
+    monkeypatch.setattr("platform.python_version", lambda: "3.11.0")
+    monkeypatch.setattr("pathlib.Path.home", lambda: fake_home)
+
+    monkeypatch.setattr("os.path.exists", lambda x: False)
+
+    sistema: SistemaInfo = coletar_sistema()
+
+    assert sistema.distribuicao == "Distribuição desconhecida"
+
+
+def test_macos_sem_versao(
+    monkeypatch: MonkeyPatch,
+    fake_home: Path,
+) -> None:
+    """macOS sem versão retornada"""
+
+    monkeypatch.setattr("platform.system", lambda: "Darwin")
+    monkeypatch.setattr("platform.release", lambda: "1.0")
+    monkeypatch.setattr("platform.machine", lambda: "x86_64")
+    monkeypatch.setattr("platform.node", lambda: "TestMachine")
+    monkeypatch.setattr("platform.python_version", lambda: "3.11.0")
+    monkeypatch.setattr("pathlib.Path.home", lambda: fake_home)
+
+    monkeypatch.setattr("platform.mac_ver", lambda: ("", ("", "", ""), ""))
+
+    sistema: SistemaInfo = coletar_sistema()
+
+    assert sistema.versao_macos == "Versão desconhecida"

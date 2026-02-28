@@ -2,35 +2,27 @@
 
 """Configuração de fixtures para testes"""
 
-from typing import Generator, Any
 from pathlib import Path
-
 import pytest
 
 from src.sistema_info import coletar_sistema, SistemaInfo
 
 
-# -------------------------------------------------
-# Fixture de home fake
-# -------------------------------------------------
 @pytest.fixture(scope="session")
 def fake_home(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Cria diretório temporário simulando a home do usuário"""
     return tmp_path_factory.mktemp("home_dir")
 
 
-# -------------------------------------------------
-# Fixture parametrizada de sistemas operacionais
-# -------------------------------------------------
 @pytest.fixture(params=["Windows", "Linux", "Darwin"])
 def sistema_parametrizado(
     request: pytest.FixtureRequest,
     monkeypatch: pytest.MonkeyPatch,
     fake_home: Path,
-) -> Generator[SistemaInfo, Any, None]:
+) -> SistemaInfo:
     """Simula diferentes sistemas operacionais"""
 
-    so = request.param
+    so: str = request.param
 
     monkeypatch.setattr("platform.system", lambda: so)
     monkeypatch.setattr("platform.release", lambda: "1.0")
@@ -57,4 +49,4 @@ def sistema_parametrizado(
             lambda: ("14.0", ("", "", ""), ""),
         )
 
-    yield coletar_sistema()
+    return coletar_sistema()
