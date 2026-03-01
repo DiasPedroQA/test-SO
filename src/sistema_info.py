@@ -1,135 +1,114 @@
-# pylint: disable=too-many-instance-attributes
-
 """
-Módulo responsável por coletar informações do sistema operacional
-e gerar relatórios JSON com base nesses dados.
+Módulo responsável por:
+
+- Detectar automaticamente o sistema operacional
+- Coletar informações relevantes
+- Gerar relatório JSON estruturado
+
+Versão simplificada e auto gerenciável.
 """
 
 import json
 import os
 import platform
 from pathlib import Path
-from dataclasses import dataclass, asdict, field
 
 
-# =====================================================
-# Modelo
-# =====================================================
-
-
-@dataclass(slots=True)
 class SistemaInfo:
-    """Armazena informações do sistema operacional e ambiente Python."""
-
-    nome_sistema: str
-    versao_sistema: str
-    arquitetura: str
-    nome_computador: str
-    user_admin: Path
-    python_versao: str
-    distribuicao: str | None = None
-    versao_macos: str | None = None
-    variaveis_windows: dict[str, str] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, str | dict[str, str]]:
-        """
-        Retorna um dicionário serializável em JSON,
-        omitindo valores None.
-        """
-        data: dict[str, str | dict[str, str]] = asdict(self)
-
-        # Converter Path para string
-        for key, value in data.items():
-            if isinstance(value, Path):
-                data[key] = str(value)
-
-        # Remover valores None
-        return {k: v for k, v in data.items() if v is not None}
-
-
-# =====================================================
-# Coleta
-# =====================================================
-
-
-def coletar_sistema() -> SistemaInfo:
     """
-    Coleta informações do sistema operacional atual
-    e retorna uma instância de SistemaInfo.
+    Classe responsável por detectar o sistema atual
+    e organizar as informações automaticamente.
     """
 
-    nome: str = platform.system()
-    versao: str = platform.release()
-    arquitetura: str = platform.machine()
-    hostname: str = platform.node()
-    home: Path = Path.home()
-    python_version: str = platform.python_version()
+    def __init__(self) -> None:
+        self.dados: dict[str, str] = {}
+        self._coletar_informacoes()
 
-    distribuicao: str | None = None
-    versao_macos: str | None = None
-    variaveis_windows: dict[str, str] = {}
+    # ===============================
+    # MÉTODO PRINCIPAL
+    # ===============================
 
-    if nome == "Windows":
-        variaveis_windows = {
-            "USERPROFILE": os.environ.get("USERPROFILE", "Desconhecido"),
-            "HOMEDRIVE": os.environ.get("HOMEDRIVE", "Desconhecido"),
-            "HOMEPATH": os.environ.get("HOMEPATH", "Desconhecido"),
-        }
+    def _coletar_informacoes(self) -> None:
+        """Detecta o SO e direciona para coleta específica."""
 
-    elif nome == "Linux":
+        self.dados.clear()  # Garante que os dados sejam limpos antes de coletar
+
+        sistema: str = platform.system()
+        self.dados.update(
+            {
+                "nome_sistema": sistema,
+                "versao_sistema": platform.release(),
+                "arquitetura": platform.machine(),
+                "nome_computador": platform.node(),
+                "user_home": str(Path.home()),
+                "python_versao": platform.python_version(),
+            }
+        )
+
+        if sistema == "Windows":
+            self._coletar_windows()
+
+        elif sistema == "Linux":
+            self._coletar_linux()
+
+        elif sistema == "Darwin":
+            self._coletar_macos()
+
+        else:
+            raise RuntimeError(f"Sistema não suportado: {sistema}")
+
+    # ===============================
+    # COLETAS ESPECÍFICAS
+    # ===============================
+
+    def _coletar_windows(self) -> None:
+        """Adiciona informações específicas do Windows."""
+        perfil_usuario: str = os.environ.get("USERPROFILE", "Desconecido")
+        home_drive: str = os.environ.get("HOMEDRIVE", "Desconecido")
+        home_path: str = os.environ.get("HOMEPATH", "Desconecido")
+        self.dados.update(
+            {
+                "windows_USERPROFILE": perfil_usuario,
+                "windows_HOMEDRIVE": home_drive,
+                "windows_HOMEPATH": home_path,
+            }
+        )
+
+    def _coletar_linux(self) -> None:
+        """Adiciona informações específicas do Linux."""
         try:
             if os.path.exists("/etc/os-release"):
                 os_release: dict[str, str] = platform.freedesktop_os_release()
-                distribuicao = os_release.get("PRETTY_NAME", "Desconhecido")
+                distribuicao: str = str(os_release.get("PRETTY_NAME"))
             else:
                 distribuicao = "Distribuição desconhecida"
-        except (ValueError, KeyError, OSError):
-            distribuicao = "Não foi possível identificar"
+        except (ValueError, KeyError):
+            distribuicao = "Não identificado"
 
-    elif nome == "Darwin":
-        mac_ver: tuple[str, tuple[str, str, str], str] = platform.mac_ver()
-        versao_macos = mac_ver[0] if mac_ver and mac_ver[0] else "Versão desconhecida"
+        self.dados.update({"linux_distribuicao": distribuicao})
 
-    return SistemaInfo(
-        nome_sistema=nome,
-        versao_sistema=versao,
-        arquitetura=arquitetura,
-        nome_computador=hostname,
-        user_admin=home,
-        python_versao=python_version,
-        distribuicao=distribuicao,
-        versao_macos=versao_macos,
-        variaveis_windows=variaveis_windows,
-    )
+    def _coletar_macos(self) -> None:
+        """Adiciona informações específicas do macOS."""
+        versao: str = platform.mac_ver()[0]
+        self.dados.update({"macos_versao": versao})
 
+    # ===============================
+    # EXPORTAÇÃO
+    # ===============================
 
-# =====================================================
-# Relatório
-# =====================================================
+    def to_dict(self) -> dict[str, str]:
+        """Retorna os dados coletados."""
+        return self.dados
 
+    def gerar_relatorio(self, output_dir: Path | None = None) -> Path:
+        """Gera arquivo JSON com os dados."""
+        pasta: Path = Path(output_dir) if output_dir else Path.cwd()
 
-def gerar_relatorio(
-    sistema: SistemaInfo,
-    output_dir: Path | None = None,
-) -> dict[str, str | dict[str, str]]:
-    """
-    Gera um relatório JSON com as informações do sistema.
+        arquivo: Path = pasta / f"relatorio_{self.dados['nome_sistema']}.json"
 
-    Args:
-        sistema: Instância de SistemaInfo.
-        output_dir: Diretório onde salvar o relatório.
+        arquivo.write_text(
+            json.dumps(self.dados, indent=4, ensure_ascii=False),
+            encoding="utf-8",
+        )
 
-    Returns:
-        Dicionário com os dados exportados.
-    """
-
-    if output_dir is None:
-        output_dir = Path.cwd()
-
-    relatorio: dict[str, str | dict[str, str]] = sistema.to_dict()
-    filename: Path = output_dir / f"relatorio_{sistema.nome_sistema}.json"
-
-    with open(filename, "w", encoding="utf-8") as file:
-        json.dump(relatorio, file, indent=4, ensure_ascii=False)
-
-    return relatorio
+        return arquivo

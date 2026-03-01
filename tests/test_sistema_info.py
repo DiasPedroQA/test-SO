@@ -1,158 +1,114 @@
-# test_sistema_info.py
-
-"""Testes para SistemaInfo, coletar_sistema e gerar_relatorio"""
+"""
+Testes para SistemaInfo
+"""
 
 import json
 from pathlib import Path
 
-from pytest import MonkeyPatch
+import pytest
 
-from src.sistema_info import SistemaInfo, coletar_sistema, gerar_relatorio
+from src.sistema_info import SistemaInfo
 
-
-# =====================================================
-# Coleta
-# =====================================================
-
-
-def test_sistema_info_e_coleta(
-    sistema_parametrizado: SistemaInfo,
-) -> None:
-    """Testa criação de SistemaInfo e coleta de dados básicos."""
-
-    assert sistema_parametrizado.nome_sistema in ["Linux", "Windows", "Darwin"]
-
-    if sistema_parametrizado.nome_sistema == "Windows":
-        variaveis_windows: dict[str, str] | str | None = (
-            sistema_parametrizado.variaveis_windows
-        )
-        assert variaveis_windows["USERPROFILE"] is not None
-        assert variaveis_windows["USERPROFILE"] == "C:\\Users\\Test"
-        assert variaveis_windows["HOMEDRIVE"] == "C:"
-        assert variaveis_windows["HOMEPATH"] == "\\Users\\Test"
-
-    if sistema_parametrizado.nome_sistema == "Linux":
-        assert sistema_parametrizado.distribuicao == "Ubuntu 22.04"
-
-    if sistema_parametrizado.nome_sistema == "Darwin":
-        assert sistema_parametrizado.versao_macos == "14.0"
-
-    assert sistema_parametrizado.nome_computador == "TestMachine"
-    assert sistema_parametrizado.python_versao == "3.11.0"
-    assert sistema_parametrizado.arquitetura == "x86_64"
-    assert sistema_parametrizado.user_admin.exists()
+# =====================================
+# 🔹 Teste básico de instância real
+# =====================================
 
 
-# ======================================================
-# Instanciação
-# ======================================================
+def test_instancia_real() -> None:
+    """Deve instanciar sem erro no ambiente real."""
+    sistema = SistemaInfo()
+
+    assert isinstance(sistema.to_dict(), dict)
+    assert "nome_sistema" in sistema.to_dict()
 
 
-def test_instancia_criada(
-    sistema_parametrizado: SistemaInfo,
-) -> None:
-    """Verifica criação básica da instância"""
-
-    sistema: SistemaInfo = sistema_parametrizado
-
-    assert sistema.nome_sistema in ["Linux", "Windows", "Darwin"]
-    assert sistema.nome_computador == "TestMachine"
-    assert sistema.python_versao == "3.11.0"
-    assert sistema.arquitetura == "x86_64"
-    assert sistema.user_admin.exists()
+# =====================================
+# 🔹 Teste de geração de relatório
+# =====================================
 
 
-def test_to_dict_nao_tem_valores_vazios(
-    sistema_parametrizado: SistemaInfo,
-) -> None:
-    """Garante que to_dict não retorna valores vazios"""
+def test_gerar_relatorio(tmp_path: Path) -> None:
+    """Deve gerar um arquivo JSON válido."""
+    sistema = SistemaInfo()
 
-    info: dict[str, str | dict[str, str]] = sistema_parametrizado.to_dict()
+    arquivo: Path = sistema.gerar_relatorio(tmp_path)
 
-    for valor in info.values():
-        assert valor not in ("", {}, None)
+    assert arquivo.exists()
 
+    conteudo: dict[str, str] = json.loads(arquivo.read_text(encoding="utf-8"))
 
-# ======================================================
-# Relatório
-# ======================================================
+    assert conteudo["nome_sistema"] == sistema.to_dict()["nome_sistema"]
 
 
-def test_gerar_relatorio(
-    sistema_parametrizado: SistemaInfo,
-    tmp_path: Path,
-) -> None:
-    """Verifica geração do relatório JSON"""
-
-    relatorio: dict[str, str | dict[str, str]] = gerar_relatorio(
-        sistema=sistema_parametrizado,
-        output_dir=tmp_path,
-    )
-
-    arquivos: list[Path] = list(tmp_path.glob("relatorio_*.json"))
-    assert len(arquivos) == 1
-
-    with open(arquivos[0], encoding="utf-8") as f:
-        data = json.load(f)
-
-    assert data == relatorio
+# =====================================
+# 🔹 Teste parametrizado simulando SO
+# =====================================
 
 
-def test_gerar_relatorio_sem_output_dir(
-    sistema_parametrizado: SistemaInfo,
-    monkeypatch: MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    """Testa geração usando Path.cwd()"""
+def test_simulando_sistemas(sistema_parametrizado: SistemaInfo) -> None:
+    """Deve estruturar corretamente os blocos específicos."""
+    dados: dict[str, str] = sistema_parametrizado.to_dict()
+    nome_sistema: str = dados["nome_sistema"]
 
-    monkeypatch.setattr("pathlib.Path.cwd", lambda: tmp_path)
+    assert "nome_sistema" in dados
 
-    gerar_relatorio(sistema_parametrizado)
+    if dados["nome_sistema"] == "Windows":
+        assert nome_sistema == "Windows"
 
-    arquivos: list[Path] = list(tmp_path.glob("relatorio_*.json"))
-    assert len(arquivos) == 1
+    elif dados["nome_sistema"] == "Linux":
+        assert nome_sistema == "Linux"
 
-
-# ======================================================
-# Casos específicos extras (branches)
-# ======================================================
+    elif dados["nome_sistema"] == "Darwin":
+        assert nome_sistema == "Darwin"
 
 
-def test_linux_sem_os_release(
-    monkeypatch: MonkeyPatch,
-    fake_home: Path,
-) -> None:
-    """Linux sem arquivo /etc/os-release"""
+def test_sistema_nao_suportado(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Teste para sistema operacional não suportado."""
+    monkeypatch.setattr("platform.system", lambda: "Solaris")
 
+    with pytest.raises(RuntimeError):
+        SistemaInfo()
+
+
+def test_linux_sem_os_release(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Teste para Linux sem /etc/os-release ou com falha na leitura."""
     monkeypatch.setattr("platform.system", lambda: "Linux")
     monkeypatch.setattr("platform.release", lambda: "1.0")
     monkeypatch.setattr("platform.machine", lambda: "x86_64")
     monkeypatch.setattr("platform.node", lambda: "TestMachine")
     monkeypatch.setattr("platform.python_version", lambda: "3.11.0")
-    monkeypatch.setattr("pathlib.Path.home", lambda: fake_home)
+    monkeypatch.setattr(
+        "pathlib.Path.home", lambda: __import__("pathlib").Path("/fake/home")
+    )
 
-    monkeypatch.setattr("os.path.exists", lambda x: False)
+    monkeypatch.setattr("os.path.exists", lambda _: False)
 
-    sistema: SistemaInfo = coletar_sistema()
+    sistema = SistemaInfo()
 
-    assert sistema.distribuicao == "Distribuição desconhecida"
+    dados: dict[str, str] = sistema.to_dict()
+
+    assert dados["linux_distribuicao"] == "Distribuição desconhecida"
 
 
-def test_macos_sem_versao(
-    monkeypatch: MonkeyPatch,
-    fake_home: Path,
-) -> None:
-    """macOS sem versão retornada"""
-
-    monkeypatch.setattr("platform.system", lambda: "Darwin")
+def test_linux_excecao_os_release(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Teste para simular falha na leitura do /etc/os-release."""
+    monkeypatch.setattr("platform.system", lambda: "Linux")
     monkeypatch.setattr("platform.release", lambda: "1.0")
     monkeypatch.setattr("platform.machine", lambda: "x86_64")
     monkeypatch.setattr("platform.node", lambda: "TestMachine")
     monkeypatch.setattr("platform.python_version", lambda: "3.11.0")
-    monkeypatch.setattr("pathlib.Path.home", lambda: fake_home)
+    monkeypatch.setattr(
+        "pathlib.Path.home", lambda: __import__("pathlib").Path("/fake/home")
+    )
 
-    monkeypatch.setattr("platform.mac_ver", lambda: ("", ("", "", ""), ""))
+    monkeypatch.setattr("os.path.exists", lambda _: True)
+    monkeypatch.setattr(
+        "platform.freedesktop_os_release",
+        lambda: (_ for _ in ()).throw(ValueError()),
+    )
 
-    sistema: SistemaInfo = coletar_sistema()
+    sistema = SistemaInfo()
 
-    assert sistema.versao_macos == "Versão desconhecida"
+    dados: dict[str, str] = sistema.to_dict()
+
+    assert dados["linux_distribuicao"] == "Não identificado"

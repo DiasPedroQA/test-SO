@@ -4,26 +4,31 @@
 # CLI
 # =====================================================
 
-
 import sys
+from pathlib import Path
 
-from src.sistema_info import SistemaInfo, coletar_sistema, gerar_relatorio
+from src.sistema_info import SistemaInfo
 
 
 def main() -> int:
     """Ponto de entrada do script."""
 
-    sistema: SistemaInfo = coletar_sistema()
-    relatorio: dict[str, str | dict[str, str]] = gerar_relatorio(sistema)
+    # Instancia automaticamente e coleta os dados
+    sistema = SistemaInfo()
+
+    # Gera relatório
+    caminho_arquivo: Path = sistema.gerar_relatorio()
 
     print("=" * 60)
     print("🔍 IDENTIFICADOR DE SISTEMA OPERACIONAL")
     print("=" * 60)
 
-    for chave, valor in relatorio.items():
+    # Exibe dados no terminal
+    for chave, valor in sistema.to_dict().items():
         print(f"• {chave}: {valor}")
 
     print("=" * 60)
+    print(f"\n📁 Relatório salvo em: {caminho_arquivo}")
 
     return 0
 
