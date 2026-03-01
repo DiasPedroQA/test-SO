@@ -64,22 +64,34 @@ jobs:
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
 
-      - name: Run Pytest with Coverage
+      - name: Run Pytest with Coverage + JUnit
         shell: bash
         run: |
           pytest tests/ \
           --cov=src \
           --cov-report=term-missing \
           --cov-report=xml \
-          --cov-fail-under=90
+          --cov-fail-under=90 \
+          --junitxml=junit.xml \
+          -o junit_family=legacy
 
+      # 🔹 Upload coverage apenas 1x (ubuntu + 3.12)
       - name: Upload Coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: DiasPedroQA/test-SO
           fail_ci_if_error: true
 
+      # 🔹 Upload test analytics
+      - name: Upload Test Results to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+  
   # -----------------------------
   # 3️⃣ SECURITY SCAN
   # -----------------------------
