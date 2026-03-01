@@ -6,8 +6,8 @@ Validação e simulação de Sistemas Operacionais com testes multi-OS reais e p
 
 ## 📊 Status do Projeto
 
-![CI](https://github.com/DiasPedroQA/test-SO/actions/workflows/ci.yml/badge.svg)
-![Coverage](https://codecov.io/gh/DiasPedroQA/test-SO/branch/main/graph/badge.svg)
+[![CI](https://github.com/DiasPedroQA/test-SO/actions/workflows/test-multi-os.yml/badge.svg?branch=main)](https://github.com/DiasPedroQA/test-SO/actions)
+[![Coverage](https://codecov.io/gh/DiasPedroQA/test-SO/branch/main/graph/badge.svg)](https://codecov.io/gh/DiasPedroQA/test-SO)
 ![Python](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
