@@ -1,4 +1,6 @@
-# Sem dependências obrigatórias para testes básicos
-# Adicione aqui se precisar de algo específico
-pytest>=7.0.0  # Opcional, para testes mais avançados
-pytest-cov>=4.0.0  # Opcional, para cobertura de código
+# ==========================
+# Test dependencies
+# ==========================
+pytest>=7.4
+pytest-cov>=4.1
+pytest-mock>=3.10

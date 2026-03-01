@@ -1,6 +1,6 @@
 # test-SO
 
-Validação e simulação de Sistemas Operacionais com testes multi-OS e pipeline avançada.
+Validação e simulação de Sistemas Operacionais com testes multi-OS reais e pipeline de integração contínua avançada.
 
 ---
 
@@ -15,16 +15,103 @@ Validação e simulação de Sistemas Operacionais com testes multi-OS e pipelin
 
 ## 🎯 Objetivo
 
-Quero validar a simulação dos mais comuns SOs e em como o pipeline se comporta na medição de testes e coleta de dados.
+Este projeto demonstra técnicas de:
+
+* Validação de comportamento dependente de sistema operacional
+* Simulação de ambientes utilizando monkeypatch
+* Execução de testes em múltiplos sistemas operacionais reais
+* Integração contínua com cobertura mínima garantida
+* Publicação automatizada de métricas de qualidade
 
 ---
 
-## 🧪 O que este projeto demonstra
+## 🧪 Funcionalidades Demonstradas
 
-- ✔ Detecção automática de SO
-- ✔ Simulação via monkeypatch
-- ✔ Testes multi-OS reais
-- ✔ Cobertura mínima garantida
-- ✔ Pipeline CI profissional
-- ✔ Segurança com Bandit
-- ✔ Publicação de cobertura no Codecov
+* ✔ Detecção automática de sistema operacional
+* ✔ Simulação controlada via monkeypatch
+* ✔ Testes executados em:
+
+  * Linux
+  * Windows
+  * macOS
+* ✔ Cobertura mínima obrigatória (90%)
+* ✔ Integração com Codecov
+* ✔ Análise estática de segurança com Bandit
+* ✔ Pipeline CI multi-OS no GitHub Actions
+
+---
+
+## 🚀 Como executar localmente
+
+### 1️⃣ Clone o projeto
+
+```bash
+git clone https://github.com/DiasPedroQA/test-SO.git
+cd test-SO
+```
+
+### 2️⃣ Crie ambiente virtual
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Linux/macOS
+# ou
+.venv\Scripts\activate  # Windows
+```
+
+### 3️⃣ Instale dependências de teste
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+### 4️⃣ Execute os testes
+
+```bash
+pytest
+```
+
+---
+
+## 📈 Cobertura de Código
+
+O projeto exige:
+
+* Cobertura mínima de 90%
+* Geração de relatório XML
+* Upload automático para Codecov
+* Análise de cobertura por patch e projeto
+
+---
+
+## 🔐 Segurança
+
+O pipeline inclui análise estática com Bandit para identificar possíveis vulnerabilidades.
+
+---
+
+## 🏗 Estrutura do Projeto
+
+```powershell
+test-SO/
+│
+├── src/
+│   └── ...
+│
+├── tests/
+│   └── ...
+│
+├── .github/workflows/
+│   ├── ci.yml
+│   └── test-multi-os.yml
+│
+├── pytest.ini
+├── codecov.yml
+└── requirements-dev.txt
+```
+
+---
+
+## 📄 Licença
+
+Distribuído sob licença MIT.

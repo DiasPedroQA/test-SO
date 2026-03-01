@@ -51,6 +51,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # 🔹 importante para comparação correta no Codecov
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -68,30 +70,30 @@ jobs:
         shell: bash
         run: |
           pytest tests/ \
-          --cov=src \
-          --cov-report=term-missing \
-          --cov-report=xml \
-          --cov-fail-under=90 \
-          --junitxml=junit.xml \
-          -o junit_family=legacy
+            --cov=src \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=90 \
+            --junitxml=junit.xml \
+            -o junit_family=legacy
 
-      # 🔹 Upload coverage apenas 1x (ubuntu + 3.12)
+      # 🔹 Upload Coverage (apenas 1x)
       - name: Upload Coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         uses: codecov/codecov-action@v5
         with:
           files: coverage.xml
           token: ${{ secrets.CODECOV_TOKEN }}
-          slug: DiasPedroQA/test-SO
           fail_ci_if_error: true
 
-      # 🔹 Upload test analytics
+      # 🔹 Upload Test Results (mesmo se testes falharem)
       - name: Upload Test Results to Codecov
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        if: always() && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-  
+          files: junit.xml
+
   # -----------------------------
   # 3️⃣ SECURITY SCAN
   # -----------------------------
